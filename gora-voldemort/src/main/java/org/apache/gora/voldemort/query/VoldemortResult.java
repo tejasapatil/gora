@@ -17,15 +17,7 @@
 package org.apache.gora.voldemort.query;
 
 import java.io.IOException;
-import java.util.Iterator;
-import java.util.Map.Entry;
 
-import org.apache.voldemort.core.client.RowIterator;
-import org.apache.voldemort.core.client.Scanner;
-import org.apache.voldemort.core.data.ByteSequence;
-import org.apache.voldemort.core.data.Key;
-import org.apache.voldemort.core.data.Value;
-import org.apache.gora.voldemort.store.VoldemortStore;
 import org.apache.gora.persistency.impl.PersistentBase;
 import org.apache.gora.query.Query;
 import org.apache.gora.query.impl.ResultBase;
@@ -35,49 +27,23 @@ import org.apache.gora.store.DataStore;
  * 
  */
 public class VoldemortResult<K,T extends PersistentBase> extends ResultBase<K,T> {
-  
-  private RowIterator iterator;
 
-  public VoldemortStore<K,T> getDataStore() {
-    return (VoldemortStore<K,T>) super.getDataStore();
-  }
+	public VoldemortResult(DataStore<K, T> dataStore, Query<K, T> query) {
+		super(dataStore, query);
+		// TODO Auto-generated constructor stub
+	}
 
-  /**
-   * @param dataStore
-   * @param query
-   * @param scanner
-   */
-  public VoldemortResult(DataStore<K,T> dataStore, Query<K,T> query, Scanner scanner) {
-    super(dataStore, query);
-    
-    // TODO set batch size based on limit, and construct iterator later
-    iterator = new RowIterator(scanner.iterator());
-  }
+	@Override
+	public float getProgress() throws IOException, InterruptedException {
+		// TODO Auto-generated method stub
+		return 0;
+	}
+
+	@Override
+	protected boolean nextInner() throws IOException {
+		// TODO Auto-generated method stub
+		return false;
+	}
   
-  @Override
-  public float getProgress() throws IOException {
-    // TODO Auto-generated method stub
-    return 0;
-  }
-  
-  @Override
-  public void close() throws IOException {
-    
-  }
-  
-  @Override
-  protected boolean nextInner() throws IOException {
-    
-    if (!iterator.hasNext())
-      return false;
-    
-    key = null;
-    
-    Iterator<Entry<Key,Value>> nextRow = iterator.next();
-    ByteSequence row = getDataStore().populate(nextRow, persistent);
-    key = (K) ((VoldemortStore) dataStore).fromBytes(getKeyClass(), row.toArray());
-    
-    return true;
-  }
   
 }
