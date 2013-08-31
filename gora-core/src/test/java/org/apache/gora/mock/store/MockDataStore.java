@@ -31,6 +31,7 @@ import org.apache.gora.query.impl.PartitionQueryImpl;
 import org.apache.gora.store.DataStoreFactory;
 import org.apache.gora.store.impl.DataStoreBase;
 import org.apache.gora.util.GoraException;
+import org.apache.hadoop.conf.Configuration;
 
 public class MockDataStore extends DataStoreBase<String, MockPersistent> {
 
@@ -41,7 +42,7 @@ public class MockDataStore extends DataStoreBase<String, MockPersistent> {
     MockDataStore dataStore;
     try {
       dataStore = DataStoreFactory.getDataStore(MockDataStore.class
-          , String.class, MockPersistent.class);
+          , String.class, MockPersistent.class, new Configuration());
       return dataStore;
     } catch (GoraException ex) {
       throw new RuntimeException(ex);
@@ -56,49 +57,47 @@ public class MockDataStore extends DataStoreBase<String, MockPersistent> {
   }
 
   @Override
-  public void close() throws IOException {
+  public void close() {
   }
 
   @Override
-  public void createSchema() throws IOException {
+  public void createSchema() {
   }
 
   @Override
-  public void deleteSchema() throws IOException {
+  public void deleteSchema() {
   }
 
   @Override
-  public void truncateSchema() throws IOException {
+  public void truncateSchema() {
   }
 
   @Override
-  public boolean schemaExists() throws IOException {
+  public boolean schemaExists() {
     return true;
   }
 
   @Override
-  public boolean delete(String key) throws IOException {
+  public boolean delete(String key) {
     return false;
   }
 
   @Override
-  public long deleteByQuery(Query<String, MockPersistent> query)
-      throws IOException {
+  public long deleteByQuery(Query<String, MockPersistent> query) {
     return 0;
   }
 
   @Override
-  public Result<String, MockPersistent> execute(
-      Query<String, MockPersistent> query) throws IOException {
+  public Result<String, MockPersistent> execute(Query<String, MockPersistent> query) {
     return null;
   }
 
   @Override
-  public void flush() throws IOException {
+  public void flush() {
   }
 
   @Override
-  public MockPersistent get(String key, String[] fields) throws IOException {
+  public MockPersistent get(String key, String[] fields) {
     return null;
   }
 
@@ -132,7 +131,7 @@ public class MockDataStore extends DataStoreBase<String, MockPersistent> {
   }
 
   @Override
-  public void put(String key, MockPersistent obj) throws IOException {
+  public void put(String key, MockPersistent obj) {
   }
 
   @Override

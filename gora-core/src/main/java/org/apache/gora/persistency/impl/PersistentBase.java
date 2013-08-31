@@ -24,17 +24,19 @@ import java.util.Map;
 
 import org.apache.avro.Schema.Field;
 import org.apache.avro.Schema.Type;
+import org.apache.avro.generic.GenericData;
 import org.apache.avro.specific.SpecificRecord;
 import org.apache.gora.avro.PersistentDatumReader;
 import org.apache.gora.persistency.ListGenericArray;
 import org.apache.gora.persistency.Persistent;
 import org.apache.gora.persistency.StateManager;
+import org.apache.gora.persistency.StatefulHashMap;
 
 /**
  * Base classs implementing common functionality for Persistent
  * classes.
  */
-public abstract class PersistentBase implements Persistent {
+public abstract class PersistentBase implements Persistent, SpecificRecord {
 
   protected static Map<Class<?>, Map<String, Integer>> FIELD_MAP =
     new HashMap<Class<?>, Map<String,Integer>>();
@@ -42,8 +44,8 @@ public abstract class PersistentBase implements Persistent {
   protected static Map<Class<?>, String[]> FIELDS =
     new HashMap<Class<?>, String[]>();
 
-  protected static final PersistentDatumReader<Persistent> datumReader =
-    new PersistentDatumReader<Persistent>();
+  protected static final PersistentDatumReader<PersistentBase> datumReader =
+    new PersistentDatumReader<PersistentBase>();
     
   private StateManager stateManager;
 
@@ -99,7 +101,15 @@ public abstract class PersistentBase implements Persistent {
 
     for(int i=0; i<getFields().length; i++) {
       switch(fields.get(i).schema().getType()) {
-        case MAP: if(get(i) != null) ((Map)get(i)).clear(); break;
+        case MAP: 
+          if(get(i) != null) {
+            if (get(i) instanceof StatefulHashMap) {
+              ((StatefulHashMap)get(i)).reuse(); 
+            } else {
+              ((Map)get(i)).clear();
+            }
+          }
+          break;
         case ARRAY:
           if(get(i) != null) {
             if(get(i) instanceof ListGenericArray) {
@@ -221,7 +231,7 @@ public abstract class PersistentBase implements Persistent {
     clearReadable(getFieldIndex(field));
   }
 
-  @Override
+  //@Override
   public boolean equals(Object o) {
     if (this == o) return true;
     if (!(o instanceof SpecificRecord)) return false;
@@ -232,7 +242,7 @@ public abstract class PersistentBase implements Persistent {
     return this.hashCode() == r2.hashCode();
   }
 
-  @Override
+  //@Override
   public int hashCode() {
     final int prime = 31;
     int result = 1;
@@ -244,12 +254,33 @@ public abstract class PersistentBase implements Persistent {
     return result;
   }
 
+  /**
+   * Computes a (record's) field's hash code.
+   * @param i Index of the field in the actual
+   * @param field
+   * @return
+   */
   private int getFieldHashCode(int i, Field field) {
     Object o = get(i);
     if(o == null)
       return 0;
 
-    if(field.schema().getType() == Type.BYTES) {
+    // XXX Union special case: in a field being union we have to check the
+    // inner schemas for Type.BYTES special case, but because it is not a
+    // field we check it this way. Too simple case to create another
+    // private method
+    boolean isUnionField = false ;
+    int unionIndex = -1 ;
+    
+    if (field.schema().getType() == Type.UNION) {
+      isUnionField = true ;
+      unionIndex = GenericData.get().resolveUnion(field.schema(), o);
+    }
+    
+    if(field.schema().getType() == Type.BYTES
+       || (isUnionField
+           && field.schema().getTypes().get(unionIndex).getType() == Type.BYTES)) {
+      // ByteBuffer.hashCode() depends on internal 'position' index, but we must ignore that.
       return getByteBufferHashCode((ByteBuffer)o);
     }
 
@@ -271,7 +302,7 @@ public abstract class PersistentBase implements Persistent {
     return datumReader.clone(this, getSchema());
   }
   
-  @Override
+  //@Override
   public String toString() {
     StringBuilder builder = new StringBuilder();
     builder.append(super.toString());

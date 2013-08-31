@@ -22,35 +22,51 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.Arrays;
 
 import org.apache.avro.Protocol;
 import org.apache.avro.Schema;
 import org.apache.avro.Protocol.Message;
 import org.apache.avro.Schema.Field;
 import org.apache.avro.specific.SpecificData;
+import org.apache.gora.util.LicenseHeaders;
+import org.apache.gora.util.TimingUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-/** Generate specific Java interfaces and classes for protocols and schemas. */
+/** Generate specific Java interfaces and classes for protocols and schemas. 
+ *  GoraCompiler takes its inspiration from, and is largely based on Avro's {@link SpecificCompiler}.
+ */
 public class GoraCompiler {
   private File dest;
   private Writer out;
   private Set<Schema> queue = new HashSet<Schema>();
+  private static final Logger log = LoggerFactory.getLogger(GoraCompiler.class);
+  private static LicenseHeaders licenseHeader = new LicenseHeaders(null);
+  private final static String DEFAULT_SCHEMA_EXTENTION = ".avsc";
 
   private GoraCompiler(File dest) {
     this.dest = dest;                             // root directory for output
   }
-
+      
   /** Generates Java interface and classes for a protocol.
    * @param src the source Avro protocol file
    * @param dest the directory to place generated files in
    */
   public static void compileProtocol(File src, File dest) throws IOException {
+    log.info("Compiling Protocol: " + src + " to: " + dest);
+    if(licenseHeader != null) {
+      log.info("The generated file will be " + licenseHeader.getLicenseName() + " licensed.");
+    }
     GoraCompiler compiler = new GoraCompiler(dest);
     Protocol protocol = Protocol.parse(src);
-    for (Schema s : protocol.getTypes())          // enqueue types
+    for (Schema s : protocol.getTypes())          // enqueue types 
       compiler.enqueue(s);
     compiler.compileInterface(protocol);          // generate interface
     compiler.compile();                           // generate classes for types
@@ -58,10 +74,27 @@ public class GoraCompiler {
 
   /** Generates Java classes for a schema. */
   public static void compileSchema(File src, File dest) throws IOException {
+    log.info("Compiling Schema: " + src + " to: " + dest);
+    if(licenseHeader != null) {
+      log.info("The generated artifact will be " + licenseHeader.getLicenseName() + " licensed.");
+    }
     GoraCompiler compiler = new GoraCompiler(dest);
     compiler.enqueue(Schema.parse(src));          // enqueue types
     compiler.compile();                           // generate classes for types
   }
+  
+  /** Generates Java classes for a number of schema files. */
+  public static void compileSchema(File[] srcFiles, File dest) throws IOException {
+  if(licenseHeader != null) {
+  log.info("The generated artifact will be " + licenseHeader.getLicenseName() + " licensed.");
+   }
+       for (File src : srcFiles) {
+        log.info("Compiling Schema: " + src + " to: " + dest);
+        GoraCompiler compiler = new GoraCompiler(dest);
+        compiler.enqueue(Schema.parse(src));          // enqueue types
+        compiler.compile();                           // generate classes for types
+  	  }
+  	}
 
   private static String camelCasify(String s) {
     return s.substring(0, 1).toUpperCase() + s.substring(1);
@@ -154,6 +187,9 @@ public class GoraCompiler {
   }
 
   private void header(String namespace) throws IOException {
+    if (licenseHeader != null) {
+      line(0, licenseHeader.getLicense());
+    }
     if(namespace != null) {
       line(0, "package "+namespace+";\n");
     }
@@ -167,6 +203,7 @@ public class GoraCompiler {
     line(0, "import org.apache.avro.util.Utf8;");
     line(0, "import org.apache.avro.ipc.AvroRemoteException;");
     line(0, "import org.apache.avro.generic.GenericArray;");
+    line(0, "import org.apache.avro.specific.FixedSize;");
     line(0, "import org.apache.avro.specific.SpecificExceptionBase;");
     line(0, "import org.apache.avro.specific.SpecificRecordBase;");
     line(0, "import org.apache.avro.specific.SpecificRecord;");
@@ -181,8 +218,6 @@ public class GoraCompiler {
           ? (s.getNamespace() != null)
           : !namespace.equals(s.getNamespace()))
         line(0, "import "+SpecificData.get().getClassName(s)+";");
-    line(0, "");
-    line(0, "@SuppressWarnings(\"all\")");
   }
 
   private String params(Schema request) throws IOException {
@@ -196,6 +231,36 @@ public class GoraCompiler {
         b.append(", ");
     }
     return b.toString();
+  }
+
+  /**
+   * Method that adds javadoc to the generated data beans.
+   * @param indent  Specifies the indentation for the javadoc
+   * @param javadoc The javadoc to be added. Use \n to span the javadoc
+   *                to multiple lines.
+   * @throws IOException
+   */
+  private void addJavaDoc(int indent, String javadoc) throws IOException {
+
+    if (javadoc==null)
+      return;
+
+    if (indent<0)
+      return;
+
+    line(indent, "");
+    line(indent, "/**");
+
+    if (javadoc.contains("\n")){
+      String javadocLines[] = javadoc.split("\n");
+
+      for(String line : javadocLines)
+        line(indent, " * "+line);
+    }
+    else
+      line(indent," * "+javadoc);
+
+    line(indent, " */");
   }
 
   private String errors(Schema errs) throws IOException {
@@ -212,28 +277,51 @@ public class GoraCompiler {
     try {
       switch (schema.getType()) {
       case RECORD:
+        addJavaDoc(0,schema.getDoc());
+        line(0, "@SuppressWarnings(\"all\")");
         String type = type(schema);
         line(0, "public class "+ type
              +" extends PersistentBase {");
+
         // schema definition
+        addJavaDoc(1,"Variable holding the data bean schema.");
         line(1, "public static final Schema _SCHEMA = Schema.parse(\""
              +esc(schema)+"\");");
 
         //field information
+        addJavaDoc(1,"Enum containing all data bean's fields.");
         line(1, "public static enum Field {");
         int i=0;
         for (Field field : schema.getFields()) {
           line(2,toUpperCase(field.name())+"("+(i++)+ ",\"" + field.name() + "\"),");
         }
         line(2, ";");
+
+        addJavaDoc(2,"Field's index.");
         line(2, "private int index;");
+
+        addJavaDoc(2,"Field's name.");
         line(2, "private String name;");
+
+        addJavaDoc(2,"Field's constructor\n"+
+                     "@param index field's index.\n"+
+                     "@param name field's name.");
         line(2, "Field(int index, String name) {this.index=index;this.name=name;}");
+
+        addJavaDoc(2,"Gets field's index.\n"+
+                     "@return int field's index.");
         line(2, "public int getIndex() {return index;}");
+
+        addJavaDoc(2,"Gets field's name.\n"+
+                "@return String field's name.");
         line(2, "public String getName() {return name;}");
+
+        addJavaDoc(2,"Gets field's attributes to string.\n"+
+                "@return String field's attributes to string.");
         line(2, "public String toString() {return name;}");
         line(1, "};");
 
+        addJavaDoc(2,"Contains all field's names.");
         StringBuilder builder = new StringBuilder(
         "public static final String[] _ALL_FIELDS = {");
         for (Field field : schema.getFields()) {
@@ -248,13 +336,17 @@ public class GoraCompiler {
 
         // field declations
         for (Field field : schema.getFields()) {
+          addJavaDoc(1,field.doc());
           line(1,"private "+unbox(field.schema())+" "+field.name()+";");
         }
 
         //constructors
+        addJavaDoc(1,"Default Constructor");
         line(1, "public " + type + "() {");
         line(2, "this(new StateManagerImpl());");
         line(1, "}");
+
+        addJavaDoc(1,"Constructor\n@param stateManager for the data bean.");
         line(1, "public " + type + "(StateManager stateManager) {");
         line(2, "super(stateManager);");
         for (Field field : schema.getFields()) {
@@ -273,13 +365,22 @@ public class GoraCompiler {
         line(1, "}");
 
         //newInstance(StateManager)
+        addJavaDoc(1,"Returns a new instance by using a state manager.\n"+
+                     "@param stateManager for the data bean.\n"+
+                     "@return "+schema.getName()+" created.");
         line(1, "public " + type + " newInstance(StateManager stateManager) {");
         line(2, "return new " + type + "(stateManager);" );
         line(1, "}");
 
         // schema method
+        addJavaDoc(1,"Returns the schema of the data bean.\n"+
+                     "@return Schema for the data bean.");
         line(1, "public Schema getSchema() { return _SCHEMA; }");
+
         // get method
+        addJavaDoc(1,"Gets a specific field.\n"+
+                     "@param field index of a field for the data bean.\n"+
+                     "@return Object representing a data bean's field.");
         line(1, "public Object get(int _field) {");
         line(2, "switch (_field) {");
         i = 0;
@@ -289,7 +390,11 @@ public class GoraCompiler {
         line(2, "default: throw new AvroRuntimeException(\"Bad index\");");
         line(2, "}");
         line(1, "}");
+
         // put method
+        addJavaDoc(1,"Puts a value for a specific field.\n"+
+                     "@param field index of a field for the data bean.\n"+
+                     "@param value value of a field for the data bean.");
         line(1, "@SuppressWarnings(value=\"unchecked\")");
         line(1, "public void put(int _field, Object _value) {");
         line(2, "if(isFieldEqual(_field, _value)) return;");
@@ -313,20 +418,33 @@ public class GoraCompiler {
           switch (fieldSchema.getType()) {
           case INT:case LONG:case FLOAT:case DOUBLE:
           case BOOLEAN:case BYTES:case STRING: case ENUM: case RECORD:
+          case FIXED:
             String unboxed = unbox(fieldSchema);
+            String fieldType = type(fieldSchema);
+            addJavaDoc(1,"Gets the "+camelKey+".\n"+
+                         "@return "+unboxed+" representing "+schema.getName()+" "+camelKey+".");
             line(1, "public "+unboxed+" get" +camelKey+"() {");
-            line(2, "return ("+type(field.schema())+") get("+i+");");
+            line(2, "return ("+fieldType+") get("+i+");");
             line(1, "}");
+
+            addJavaDoc(1,"Sets the "+camelKey+".\n"+
+                         "@param value containing "+schema.getName()+" "+camelKey+".");
             line(1, "public void set"+camelKey+"("+unboxed+" value) {");
             line(2, "put("+i+", value);");
             line(1, "}");
             break;
           case ARRAY:
             unboxed = unbox(fieldSchema.getElementType());
+            fieldType = type(fieldSchema.getElementType());
 
-            line(1, "public GenericArray<"+unboxed+"> get"+camelKey+"() {");
-            line(2, "return (GenericArray<"+unboxed+">) get("+i+");");
+            addJavaDoc(1,"Gets the "+camelKey+" array.\n"+
+                    "@return GenericArray<"+fieldType+"> containing "+fieldType+" elements.");
+            line(1, "public GenericArray<"+fieldType+"> get"+camelKey+"() {");
+            line(2, "return (GenericArray<"+fieldType+">) get("+i+");");
             line(1, "}");
+
+            addJavaDoc(1,"Adds a "+unboxed+" element into the array.\n"+
+                    "@param the "+unboxed+" element to be added.");
             line(1, "public void addTo"+camelKey+"("+unboxed+" element) {");
             line(2, "getStateManager().setDirty(this, "+i+");");
             line(2, field.name()+".add(element);");
@@ -334,22 +452,63 @@ public class GoraCompiler {
             break;
           case MAP:
             unboxed = unbox(fieldSchema.getValueType());
-            line(1, "public Map<Utf8, "+unboxed+"> get"+camelKey+"() {");
-            line(2, "return (Map<Utf8, "+unboxed+">) get("+i+");");
+            fieldType = type(fieldSchema.getValueType());
+
+            addJavaDoc(1,"Gets "+camelKey+".\n"+
+                    "@return Map containing "+camelKey+" value.");
+            line(1, "public Map<Utf8, "+fieldType+"> get"+camelKey+"() {");
+            line(2, "return (Map<Utf8, "+fieldType+">) get("+i+");");
             line(1, "}");
-            line(1, "public "+unboxed+" getFrom"+camelKey+"(Utf8 key) {");
+
+            addJavaDoc(1,"Gets the "+camelKey+"'s value using a key.\n"+
+                    "@param key gets a specific "+camelKey+" using a "+schema.getName()+"ID.\n"+
+                    "@return "+fieldType+" containing "+camelKey+" value.");
+            line(1, "public "+fieldType+" getFrom"+camelKey+"(Utf8 key) {");
             line(2, "if ("+field.name()+" == null) { return null; }");
             line(2, "return "+field.name()+".get(key);");
             line(1, "}");
+
+            addJavaDoc(1,"Adds a "+camelKey+" into a "+schema.getName()+".\n"+
+                    "@param Map containing "+camelKey+" value.");
             line(1, "public void putTo"+camelKey+"(Utf8 key, "+unboxed+" value) {");
             line(2, "getStateManager().setDirty(this, "+i+");");
             line(2, field.name()+".put(key, value);");
             line(1, "}");
-            line(1, "public "+unboxed+" removeFrom"+camelKey+"(Utf8 key) {");
+
+            addJavaDoc(1,"Removes "+camelKey+" from a "+schema.getName()+".\n"+
+                    "@return key "+schema.getName()+" ID to be removed.");
+            line(1, "public "+fieldType+" removeFrom"+camelKey+"(Utf8 key) {");
             line(2, "if ("+field.name()+" == null) { return null; }");
             line(2, "getStateManager().setDirty(this, "+i+");");
             line(2, "return "+field.name()+".remove(key);");
             line(1, "}");
+            break;
+          case UNION:
+            fieldType = type(fieldSchema);
+
+            //Create get method: public <unbox(field.schema())> get<camelKey>()
+            addJavaDoc(1,"Gets "+camelKey+".\n"+
+                    "@return the "+unbox(field.schema())+" value.");
+            line(1, "public "+unbox(field.schema())+" get" +camelKey+"() {");
+            line(2, "return ("+unbox(field.schema())+") get("+i+");");
+            line(1, "}");
+            
+            //Create set methods: public void set<camelKey>(<subschema.fieldType> value)
+            for (Schema s : fieldSchema.getTypes()) {
+              if (s.getType().equals(Schema.Type.NULL)) continue ;
+              String unionFieldType = type(s);
+
+              addJavaDoc(1,"Sets the "+camelKey+".\n"+
+                      "@param the "+camelKey+" value to be set.");
+              line(1, "public void set"+camelKey+"("+unionFieldType+" value) {");
+              line(2, "put("+i+", value);");
+              line(1, "}");
+            }
+            break;
+          case NULL:
+            throw new RuntimeException("Unexpected NULL field: "+field);
+          default:
+            throw new RuntimeException("Unknown field: "+field);
           }
           i++;
         }
@@ -437,13 +596,105 @@ public class GoraCompiler {
   private static String esc(Object o) {
     return o.toString().replace("\"", "\\\"");
   }
-
+  
+  /**
+   * The main method used to invoke the GoraCompiler. It accepts an input (JSON) avsc 
+   * schema file, the target output directory and an optional parameter defining the
+   * license header to be used when compiling the avsc into the generated class.
+   * If no license is explicitely defined, an ASFv2.0 license header is attributed
+   * to all generated files by default.
+   */
   public static void main(String[] args) throws Exception {
     if (args.length < 2) {
-      System.err.println("Usage: SpecificCompiler <schema file> <output dir>");
+      System.err.println("Usage: GoraCompiler <schema file> <output dir> [-license <id>]");
+      System.err.println("  <schema file>     - individual avsc file to be compiled or a directory path containing avsc files");
+      System.err.println("  <output dir>      - output directory for generated Java files");
+      System.err.println("  [-license <id>]   - the preferred license header to add to the\n" +
+              "\t\t      generated Java file. Current options include; \n" +
+              "\t\t  ASLv2   (Apache Software License v2.0) \n" +
+              "\t\t  AGPLv3  (GNU Affero General Public License)\n" +
+              "\t\t  CDDLv1  (Common Development and Distribution License v1.0)\n" +
+              "\t\t  FDLv13  (GNU Free Documentation License v1.3)\n" +
+              "\t\t  GPLv1   (GNU General Public License v1.0)\n" +
+              "\t\t  GPLv2   (GNU General Public License v2.0)\n" +
+              "\t\t  GPLv3   (GNU General Public License v3.0)\n " +
+              "\t\t  LGPLv21 (GNU Lesser General Public License v2.1)\n" +
+              "\t\t  LGPLv3  (GNU Lesser General Public License v3)\n") ;
       System.exit(1);
     }
-    compileSchema(new File(args[0]), new File(args[1]));
+
+    SimpleDateFormat sdf;
+    File inputFile;
+    File output;
+    long start;
+
+    for (int i = 1; i < args.length; i++) {
+      licenseHeader.setLicenseName("ASLv2");
+      if ("-license".equals(args[i])) {
+        licenseHeader.setLicenseName(args[++i]);
+      }
+    }
+
+    if (args.length==2){ //case of single file or single directory
+      inputFile = new File(args[0]);
+      output = new File(args[1]);
+
+      if(!inputFile.exists() || !output.exists()){
+        log.error("input file path or output file path doesn't exist.");
+        System.exit(1);
+      }
+
+      sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+      start = System.currentTimeMillis();
+      log.info("GoraCompiler: starting at " + sdf.format(start));
+      if(inputFile.isDirectory()) {
+        ArrayList<File> inputSchemas = new ArrayList<File>();
+        File[] listOfFiles= inputFile.listFiles();
+
+        if ( (listOfFiles!=null) && (listOfFiles.length>0)){
+          for (File file : listOfFiles) {
+            if (file.isFile() && file.exists() && file.getName().endsWith(DEFAULT_SCHEMA_EXTENTION)) {
+              inputSchemas.add(file);
+            }
+          }
+
+          compileSchema(inputSchemas.toArray(new File[inputSchemas.size()]), output);
+        }
+        else{
+          log.info("Path contains no files. Nothing to compile.");
+        }
+      }
+      else if (inputFile.isFile()) {
+        compileSchema(inputFile, output);
+      }
+    }
+    else{ //case of dynamic filename extension (such as *.* or *.json)
+      List<String> files = new ArrayList<String>(Arrays.asList(args));
+      output = new File(files.get(files.size()-1));
+      files.remove(files.size()-1); //remove the last one, as this is the output directory
+
+      if(!output.exists()){
+        log.error("output path doesn't exist");
+        System.exit(1);
+      }
+
+      sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+      start = System.currentTimeMillis();
+      log.info("GoraCompiler: starting at " + sdf.format(start));
+
+      for(String filename : files){ //loop for all the retrieved files
+        inputFile = new File(filename);
+        if(!inputFile.exists()){
+          log.error("input file: "+filename+" doesn't exist.");
+          continue; //in case the file does not exist, continue to the next file
+        }
+
+        compileSchema(inputFile, output);
+      }
+    }
+
+    long end = System.currentTimeMillis();
+    log.info("GoraCompiler: finished at " + sdf.format(end) + ", elapsed: " + TimingUtil.elapsedTime(start, end));
   }
 
 }

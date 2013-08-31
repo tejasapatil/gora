@@ -25,13 +25,14 @@ import java.text.SimpleDateFormat;
 import java.util.StringTokenizer;
 
 import org.apache.avro.util.Utf8;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.apache.gora.query.Query;
 import org.apache.gora.query.Result;
 import org.apache.gora.store.DataStore;
 import org.apache.gora.store.DataStoreFactory;
 import org.apache.gora.tutorial.log.generated.Pageview;
+import org.apache.hadoop.conf.Configuration;
 
 /**
  * LogManager is the tutorial class to illustrate the basic 
@@ -44,12 +45,12 @@ import org.apache.gora.tutorial.log.generated.Pageview;
  * <code>gora-tutorial/src/main/avro/pageview.json</code>.
  * 
  * <p>See the tutorial.html file in docs or go to the 
- * <a href="http://incubator.apache.org/gora/docs/current/tutorial.html"> 
+ * <a href="http://gora.apache.org/docs/current/tutorial.html"> 
  * web site</a>for more information.</p>
  */
 public class LogManager {
 
-  private static final Log log = LogFactory.getLog(LogManager.class);
+  private static final Logger log = LoggerFactory.getLogger(LogManager.class);
   
   private DataStore<Long, Pageview> dataStore; 
   
@@ -68,14 +69,15 @@ public class LogManager {
     //Data store objects are created from a factory. It is necessary to 
     //provide the key and value class. The datastore class is optional, 
     //and if not specified it will be read from the properties file
-    dataStore = DataStoreFactory.getDataStore(Long.class, Pageview.class);
+    dataStore = DataStoreFactory.getDataStore(Long.class, Pageview.class,
+            new Configuration());
   }
   
   /**
    * Parses a log file and store the contents at the data store.
    * @param input the input file location
    */
-  private void parse(String input) throws IOException, ParseException {
+  private void parse(String input) throws IOException, ParseException, Exception {
     log.info("Parsing file:" + input);
     BufferedReader reader = new BufferedReader(new FileReader(input));
     long lineCount = 0;
@@ -134,18 +136,19 @@ public class LogManager {
   }
   
   /** Stores the pageview object with the given key */
-  private void storePageview(long key, Pageview pageview) throws IOException {
+  private void storePageview(long key, Pageview pageview) throws IOException, Exception {
+	log.info("Storing Pageview in: " + dataStore.toString());
     dataStore.put(key, pageview);
   }
   
   /** Fetches a single pageview object and prints it*/
-  private void get(long key) throws IOException {
+  private void get(long key) throws IOException, Exception {
     Pageview pageview = dataStore.get(key);
     printPageview(pageview);
   }
   
   /** Queries and prints a single pageview object */
-  private void query(long key) throws IOException {
+  private void query(long key) throws IOException, Exception {
     //Queries are constructed from the data store
     Query<Long, Pageview> query = dataStore.newQuery();
     query.setKey(key);
@@ -157,7 +160,7 @@ public class LogManager {
   }
   
   /** Queries and prints pageview object that have keys between startKey and endKey*/
-  private void query(long startKey, long endKey) throws IOException {
+  private void query(long startKey, long endKey) throws IOException, Exception {
     Query<Long, Pageview> query = dataStore.newQuery();
     //set the properties of query
     query.setStartKey(startKey);
@@ -178,7 +181,7 @@ public class LogManager {
   }
   
   /** This method illustrates delete by query call */
-  private void deleteByQuery(long startKey, long endKey) throws IOException {
+  private void deleteByQuery(long startKey, long endKey) throws IOException, Exception {
     //Constructs a query from the dataStore. The matching rows to this query will be deleted
     Query<Long, Pageview> query = dataStore.newQuery();
     //set the properties of query
@@ -189,7 +192,7 @@ public class LogManager {
     log.info("pageviews with keys between " + startKey + " and " + endKey + " are deleted");
   }
   
-  private void printResult(Result<Long, Pageview> result) throws IOException {
+  private void printResult(Result<Long, Pageview> result) throws IOException, Exception {
     
     while(result.next()) { //advances the Result object and breaks if at end
       long resultKey = result.getKey(); //obtain current key
@@ -212,7 +215,7 @@ public class LogManager {
     }
   }
   
-  private void close() throws IOException {
+  private void close() throws IOException, Exception {
     //It is very important to close the datastore properly, otherwise
     //some data loss might occur.
     if(dataStore != null)
@@ -237,7 +240,7 @@ public class LogManager {
     if("-parse".equals(args[0])) {
       manager.parse(args[1]);
     } else if("-get".equals(args[0])) {
-        manager.get(Long.parseLong(args[1]));
+      manager.get(Long.parseLong(args[1]));
     } else if("-query".equals(args[0])) {
       if(args.length == 2) 
         manager.query(Long.parseLong(args[1]));

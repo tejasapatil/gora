@@ -42,7 +42,7 @@ import org.apache.avro.ipc.ByteBufferInputStream;
 import org.apache.avro.ipc.ByteBufferOutputStream;
 import org.apache.gora.avro.PersistentDatumReader;
 import org.apache.gora.avro.PersistentDatumWriter;
-import org.apache.gora.persistency.Persistent;
+import org.apache.gora.persistency.impl.PersistentBase;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.io.DataOutputBuffer;
@@ -146,7 +146,7 @@ public class IOUtils {
   @SuppressWarnings("unchecked")
   public static<T> void serialize(Configuration conf, DataOutput out
       , T obj) throws IOException {
-    Text.writeString(out, obj.getClass().getCanonicalName());
+    Text.writeString(out, obj.getClass().getName());
     serialize(conf, out, obj, (Class<T>)obj.getClass());
   }
 
@@ -162,7 +162,7 @@ public class IOUtils {
   /**
    * Serializes the field object using the datumWriter.
    */
-  public static<T extends Persistent> void serialize(OutputStream os,
+  public static<T extends PersistentBase> void serialize(OutputStream os,
       PersistentDatumWriter<T> datumWriter, Schema schema, Object object)
       throws IOException {
 
@@ -174,7 +174,7 @@ public class IOUtils {
   /**
    * Serializes the field object using the datumWriter.
    */
-  public static<T extends Persistent> byte[] serialize(PersistentDatumWriter<T> datumWriter
+  public static<T extends PersistentBase> byte[] serialize(PersistentDatumWriter<T> datumWriter
       , Schema schema, Object object) throws IOException {
     ByteArrayOutputStream os = new ByteArrayOutputStream();
     serialize(os, datumWriter, schema, object);
@@ -189,7 +189,7 @@ public class IOUtils {
   public static<T> T deserialize(Configuration conf, DataInput in
       , T obj , String objClass) throws IOException, ClassNotFoundException {
 
-    Class<T> c = (Class<T>) Class.forName(objClass);
+    Class<T> c = (Class<T>) ClassLoadingUtils.loadClass(objClass);
 
     return deserialize(conf, in, obj, c);
   }
@@ -233,7 +233,7 @@ public class IOUtils {
   public static<T> T deserialize(Configuration conf, DataInput in
       , T obj) throws IOException, ClassNotFoundException {
     String clazz = Text.readString(in);
-    Class<T> c = (Class<T>)Class.forName(clazz);
+    Class<T> c = (Class<T>)ClassLoadingUtils.loadClass(clazz);
     return deserialize(conf, in, obj, c);
   }
 
@@ -252,7 +252,7 @@ public class IOUtils {
    * Deserializes the field object using the datumReader.
    */
   @SuppressWarnings("unchecked")
-  public static<K, T extends Persistent> K deserialize(InputStream is,
+  public static<K, T extends PersistentBase> K deserialize(InputStream is,
       PersistentDatumReader<T> datumReader, Schema schema, K object)
       throws IOException {
     decoder = DecoderFactory.defaultFactory().createBinaryDecoder(is, decoder);
@@ -263,7 +263,7 @@ public class IOUtils {
    * Deserializes the field object using the datumReader.
    */
   @SuppressWarnings("unchecked")
-  public static<K, T extends Persistent> K deserialize(byte[] bytes,
+  public static<K, T extends PersistentBase> K deserialize(byte[] bytes,
       PersistentDatumReader<T> datumReader, Schema schema, K object)
       throws IOException {
     decoder = DecoderFactory.defaultFactory().createBinaryDecoder(bytes, decoder);
@@ -274,7 +274,7 @@ public class IOUtils {
   /**
    * Serializes the field object using the datumWriter.
    */
-  public static<T extends Persistent> byte[] deserialize(PersistentDatumWriter<T> datumWriter
+  public static<T extends PersistentBase> byte[] deserialize(PersistentDatumWriter<T> datumWriter
       , Schema schema, Object object) throws IOException {
     ByteArrayOutputStream os = new ByteArrayOutputStream();
     serialize(os, datumWriter, schema, object);
@@ -460,7 +460,7 @@ public class IOUtils {
   public static<T> void storeToConf(T obj, Configuration conf, String dataKey)
     throws IOException {
     String classKey = dataKey + "._class";
-    conf.set(classKey, obj.getClass().getCanonicalName());
+    conf.set(classKey, obj.getClass().getName());
     DefaultStringifier.store(conf, obj, dataKey);
   }
 
@@ -477,7 +477,7 @@ public class IOUtils {
     String classKey = dataKey + "._class";
     String className = conf.get(classKey);
     try {
-      T obj = (T) DefaultStringifier.load(conf, dataKey, Class.forName(className));
+      T obj = (T) DefaultStringifier.load(conf, dataKey, ClassLoadingUtils.loadClass(className));
       return obj;
     } catch (Exception ex) {
       throw new IOException(ex);

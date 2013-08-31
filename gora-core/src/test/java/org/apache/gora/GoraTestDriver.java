@@ -22,24 +22,26 @@ import java.io.IOException;
 import java.util.HashSet;
 import java.util.Properties;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.apache.gora.persistency.Persistent;
 import org.apache.gora.store.DataStore;
 import org.apache.gora.store.DataStoreFactory;
 import org.apache.gora.util.GoraException;
+import org.apache.hadoop.conf.Configuration;
 
 /**
- * GoraTestDriver is a helper class for third party tests.
- * GoraTestDriver can be used to initialize and tear down mini clusters
- * (such as mini HBase cluster, local Hsqldb instance, etc) so that
- * these details are abstracted away.
+ * GoraTestDriver is a helper class for third party tests and should
+ * be used to initialize and tear down mini clusters (such as mini HBase 
+ * or Cassandra cluster, local Hsqldb instance, etc) so that these 
+ * details are abstracted away.
  */
 public class GoraTestDriver {
 
-  protected static final Log log = LogFactory.getLog(GoraTestDriver.class);
+  protected static final Logger log = LoggerFactory.getLogger(GoraTestDriver.class);
 
   protected Class<? extends DataStore> dataStoreClass;
+  protected Configuration conf = new Configuration();
 
   @SuppressWarnings("rawtypes")
   protected HashSet<DataStore> dataStores;
@@ -54,7 +56,7 @@ public class GoraTestDriver {
    * method annotated with org.junit.BeforeClass
    */
   public void setUpClass() throws Exception {
-    setProperties(DataStoreFactory.properties);
+    setProperties(DataStoreFactory.createProps());
   }
 
   /** Should be called once after the tests have finished, probably in the
@@ -69,11 +71,8 @@ public class GoraTestDriver {
    */
   public void setUp() throws Exception {
     log.info("setting up test");
-    try {
-      for(DataStore store : dataStores) {
-        store.truncateSchema();
-      }
-    }catch (IOException ignore) {
+    for(DataStore store : dataStores) {
+      store.truncateSchema();
     }
   }
     
@@ -84,13 +83,13 @@ public class GoraTestDriver {
   public void tearDown() throws Exception {
     log.info("tearing down test");
     //delete everything
-    try {
-      for(DataStore store : dataStores) {
+    for(DataStore store : dataStores) {
+      try {
         //store.flush();
         store.deleteSchema();
         store.close();
+      }catch (Exception ignore) {
       }
-    }catch (IOException ignore) {
     }
     dataStores.clear();
   }
@@ -101,11 +100,12 @@ public class GoraTestDriver {
   @SuppressWarnings("unchecked")
   public<K, T extends Persistent> DataStore<K,T>
     createDataStore(Class<K> keyClass, Class<T> persistentClass) throws GoraException {
-    setProperties(DataStoreFactory.properties);
+    setProperties(DataStoreFactory.createProps());
     DataStore<K,T> dataStore = DataStoreFactory.createDataStore(
-        (Class<? extends DataStore<K,T>>)dataStoreClass, keyClass, persistentClass);
+        (Class<? extends DataStore<K,T>>)dataStoreClass, keyClass, persistentClass, conf);
     dataStores.add(dataStore);
 
+    log.info("Datastore for "+persistentClass+" was added.");
     return dataStore;
   }
   

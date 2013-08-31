@@ -24,8 +24,6 @@ import static org.apache.gora.examples.WebPageDataCreator.createWebPageData;
 
 import java.io.IOException;
 
-import junit.framework.Assert;
-
 import org.apache.gora.avro.store.AvroStore.CodecType;
 import org.apache.gora.examples.generated.Employee;
 import org.apache.gora.examples.generated.WebPage;
@@ -40,6 +38,7 @@ import org.apache.hadoop.fs.Path;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import static org.junit.Assert.assertEquals;
 
 /**
  * Test case for {@link AvroStore}.
@@ -58,12 +57,12 @@ public class TestAvroStore {
   @Before
   public void setUp() throws Exception {
     employeeStore = createEmployeeDataStore();
-    employeeStore.initialize(String.class, Employee.class, DataStoreFactory.properties);
+    employeeStore.initialize(String.class, Employee.class, DataStoreFactory.createProps());
     employeeStore.setOutputPath(EMPLOYEE_OUTPUT);
     employeeStore.setInputPath(EMPLOYEE_OUTPUT);
 
     webPageStore = new AvroStore<String, WebPage>();
-    webPageStore.initialize(String.class, WebPage.class, DataStoreFactory.properties);
+    webPageStore.initialize(String.class, WebPage.class, DataStoreFactory.createProps());
     webPageStore.setOutputPath(WEBPAGE_OUTPUT);
     webPageStore.setInputPath(WEBPAGE_OUTPUT);
   }
@@ -71,7 +70,7 @@ public class TestAvroStore {
   @SuppressWarnings("unchecked")
   protected AvroStore<String, Employee> createEmployeeDataStore() throws GoraException {
     return DataStoreFactory.getDataStore(
-        AvroStore.class, String.class, Employee.class);
+        AvroStore.class, String.class, Employee.class, conf);
   }
 
   protected AvroStore<String, WebPage> createWebPageDataStore() {
@@ -95,27 +94,27 @@ public class TestAvroStore {
   }
 
   @Test
-  public void testNewInstance() throws IOException {
+  public void testNewInstance() throws IOException, Exception {
     DataStoreTestUtil.testNewPersistent(employeeStore);
   }
 
   @Test
-  public void testCreateSchema() throws IOException {
+  public void testCreateSchema() throws IOException, Exception {
     DataStoreTestUtil.testCreateEmployeeSchema(employeeStore);
   }
 
   @Test
-  public void testAutoCreateSchema() throws IOException {
+  public void testAutoCreateSchema() throws IOException, Exception {
     DataStoreTestUtil.testAutoCreateSchema(employeeStore);
   }
 
   @Test
-  public void testPut() throws IOException {
+  public void testPut() throws IOException, Exception {
     DataStoreTestUtil.testPutEmployee(employeeStore);
   }
 
   @Test
-  public void testQuery() throws IOException {
+  public void testQuery() throws IOException, Exception {
     createWebPageData(webPageStore);
     webPageStore.close();
 
@@ -124,7 +123,7 @@ public class TestAvroStore {
   }
 
   @Test
-  public void testQueryBinaryEncoder() throws IOException {
+  public void testQueryBinaryEncoder() throws IOException, Exception {
     webPageStore.setCodecType(CodecType.BINARY);
     webPageStore.setInputPath(webPageStore.getOutputPath());
 
@@ -136,7 +135,7 @@ public class TestAvroStore {
   //AvroStore should be closed so that Hadoop file is completely flushed,
   //so below test is copied and modified to close the store after pushing data
   public static void testQueryWebPages(DataStore<String, WebPage> store)
-  throws IOException {
+  throws IOException, Exception {
 
     Query<String, WebPage> query = store.newQuery();
     Result<String, WebPage> result = query.execute();
@@ -147,7 +146,7 @@ public class TestAvroStore {
       DataStoreTestUtil.assertWebPage(page, URL_INDEXES.get(page.getUrl().toString()));
       i++;
     }
-    Assert.assertEquals(i, URLS.length);
+    assertEquals(i, URLS.length);
   }
 
 }

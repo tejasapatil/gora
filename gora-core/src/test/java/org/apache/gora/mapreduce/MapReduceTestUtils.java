@@ -18,12 +18,11 @@
 
 package org.apache.gora.mapreduce;
 
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.apache.gora.examples.WebPageDataCreator;
 import org.apache.gora.examples.generated.TokenDatum;
 import org.apache.gora.examples.generated.WebPage;
@@ -31,46 +30,44 @@ import org.apache.gora.examples.mapreduce.QueryCounter;
 import org.apache.gora.examples.mapreduce.WordCount;
 import org.apache.gora.query.Query;
 import org.apache.gora.store.DataStore;
+import org.apache.gora.store.impl.DataStoreBase;
 import org.apache.hadoop.conf.Configuration;
-import org.junit.Assert;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 
 public class MapReduceTestUtils {
 
-  private static final Log log = LogFactory.getLog(MapReduceTestUtils.class);
+  private static final Logger log = LoggerFactory.getLogger(MapReduceTestUtils.class);
   
   /** Tests by running the {@link QueryCounter} mapreduce job */
-  public static void testCountQuery(DataStore<String, WebPage> dataStore
-      , Configuration conf) 
-  throws Exception {
-    
-    dataStore.setConf(conf);
+  public static void testCountQuery(DataStore<String, WebPage> dataStore, Configuration conf)
+      throws Exception {
+
+    ((DataStoreBase<String, WebPage>)dataStore).setConf(conf);
     
     //create input
     WebPageDataCreator.createWebPageData(dataStore);
-    
-    
+
     QueryCounter<String,WebPage> counter = new QueryCounter<String,WebPage>(conf);
     Query<String,WebPage> query = dataStore.newQuery();
     query.setFields(WebPage._ALL_FIELDS);
     
     dataStore.close();
-    
-    
+
     //run the job
     log.info("running count query job");
     long result = counter.countQuery(dataStore, query);
     log.info("finished count query job");
     
     //assert results
-    Assert.assertEquals(WebPageDataCreator.URLS.length, result);
-    
+    assertEquals(WebPageDataCreator.URLS.length, result);
   }
  
-  public static void testWordCount(Configuration conf, 
-      DataStore<String,WebPage> inStore, DataStore<String, 
+  public static void testWordCount(Configuration conf, DataStore<String,WebPage> inStore, DataStore<String,
       TokenDatum> outStore) throws Exception {
-    inStore.setConf(conf);
-    outStore.setConf(conf);
+	  //Datastore now has to be a Hadoop based datastore
+    ((DataStoreBase<String,WebPage>)inStore).setConf(conf);
+    ((DataStoreBase<String,TokenDatum>)outStore).setConf(conf);
     
     //create input
     WebPageDataCreator.createWebPageData(inStore);
@@ -82,11 +79,13 @@ public class MapReduceTestUtils {
     //assert results
     HashMap<String, Integer> actualCounts = new HashMap<String, Integer>();
     for(String content : WebPageDataCreator.CONTENTS) {
-      for(String token:content.split(" ")) {
-        Integer count = actualCounts.get(token);
-        if(count == null) 
-          count = 0;
-        actualCounts.put(token, ++count);
+      if (content != null) {
+        for(String token:content.split(" ")) {
+          Integer count = actualCounts.get(token);
+          if(count == null) 
+            count = 0;
+          actualCounts.put(token, ++count);
+        }
       }
     }
     for(Map.Entry<String, Integer> entry:actualCounts.entrySet()) {
@@ -95,9 +94,9 @@ public class MapReduceTestUtils {
   }
   
   private static void assertTokenCount(DataStore<String, TokenDatum> outStore,
-      String token, int count) throws IOException {
+      String token, int count) throws Exception {
     TokenDatum datum = outStore.get(token, null);
-    Assert.assertNotNull("token:" + token + " cannot be found in datastore", datum);
-    Assert.assertEquals("count for token:" + token + " is wrong", count, datum.getCount());
+    assertNotNull("token:" + token + " cannot be found in datastore", datum);
+    assertEquals("count for token:" + token + " is wrong", count, datum.getCount());
   }
 }

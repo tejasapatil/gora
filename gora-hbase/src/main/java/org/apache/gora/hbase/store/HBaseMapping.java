@@ -28,88 +28,152 @@ import org.apache.hadoop.hbase.regionserver.StoreFile.BloomType;
 import org.apache.hadoop.hbase.util.Bytes;
 
 /**
- * Mapping definitions for HBase
+ * Mapping definitions for HBase. Thread safe.
+ * It holds a definition for a single table. 
  */
 public class HBaseMapping {
 
-  private Map<String, HTableDescriptor> tableDescriptors 
-    = new HashMap<String, HTableDescriptor>();
-  
-  //name of the primary table
-  private String tableName; 
+  private final HTableDescriptor tableDescriptor;
   
   // a map from field name to hbase column
-  private Map<String, HBaseColumn> columnMap = 
-    new HashMap<String, HBaseColumn>();
+  private final Map<String, HBaseColumn> columnMap;
   
-  public HBaseMapping() {
+  public HBaseMapping(HTableDescriptor tableDescriptor,
+      Map<String, HBaseColumn> columnMap) {
+    super();
+    this.tableDescriptor = tableDescriptor;
+    this.columnMap = columnMap;
   }
   
-  public void setTableName(String tableName) {
-    this.tableName = tableName;
-  }
-  
+
   public String getTableName() {
-    return tableName;
-  }
-  
-  public void addTable(String tableName) {
-    if(!tableDescriptors.containsKey(tableName)) {
-      tableDescriptors.put(tableName, new HTableDescriptor(tableName));
-    }
+    return tableDescriptor.getNameAsString();
   }
   
   public HTableDescriptor getTable() {
-    return getTable(tableName);
+    return tableDescriptor;
   }
   
-  public HTableDescriptor getTable(String tableName) {
-    return tableDescriptors.get(tableName);
-  }
-  
-  public void addColumnFamily(String tableName, String familyName
-      , String compression, String blockCache, String blockSize, String bloomFilter
-      , String maxVersions, String timeToLive, String inMemory) {
-    
-    HColumnDescriptor columnDescriptor = addColumnFamily(tableName, familyName);
-    
-    if(compression != null)
-      columnDescriptor.setCompressionType(Algorithm.valueOf(compression));
-    if(blockCache != null)
-      columnDescriptor.setBlockCacheEnabled(Boolean.parseBoolean(blockCache));
-    if(blockSize != null)
-      columnDescriptor.setBlocksize(Integer.parseInt(blockSize));
-    if(bloomFilter != null)
-      columnDescriptor.setBloomFilterType(BloomType.valueOf(bloomFilter));
-    if(maxVersions != null)
-      columnDescriptor.setMaxVersions(Integer.parseInt(maxVersions));
-    if(timeToLive != null)
-      columnDescriptor.setTimeToLive(Integer.parseInt(timeToLive));
-    if(inMemory != null)
-      columnDescriptor.setInMemory(Boolean.parseBoolean(inMemory));
-    
-    getTable(tableName).addFamily(columnDescriptor);
-  }
-  
-  public HColumnDescriptor addColumnFamily(String tableName, String familyName) {
-    HTableDescriptor tableDescriptor = getTable(tableName);
-    HColumnDescriptor columnDescriptor =  tableDescriptor.getFamily(Bytes.toBytes(familyName));
-    if(columnDescriptor == null) {
-      columnDescriptor = new HColumnDescriptor(familyName);
-      tableDescriptor.addFamily(columnDescriptor);
-    }
-    return columnDescriptor;
-  }
-  
-  public void addField(String fieldName, String tableName, String family, String qualifier) {
-    byte[] familyBytes = Bytes.toBytes(family);
-    byte[] qualifierBytes = qualifier == null ? null : Bytes.toBytes(qualifier);
-    
-    HBaseColumn column = new HBaseColumn(tableName, familyBytes, qualifierBytes);
-    columnMap.put(fieldName, column);
-  }
- 
   public HBaseColumn getColumn(String fieldName) {
     return columnMap.get(fieldName);
   }
+  
+  /**
+   * A builder for creating the mapper. This will allow building a thread safe
+   * {@link HBaseMapping} using simple immutabilty.
+   *
+   */
+  public static class HBaseMappingBuilder { 
+    private Map<String, Map<String, HColumnDescriptor>> tableToFamilies = 
+      new HashMap<String, Map<String, HColumnDescriptor>>();
+    private Map<String, HBaseColumn> columnMap = 
+      new HashMap<String, HBaseColumn>();
+    
+    private String tableName;
+    
+    public String getTableName() {
+      return tableName;
+    }
+    
+    public void setTableName(String tableName) {
+      this.tableName = tableName;
+    }
+    
+    public void addFamilyProps(String tableName, String familyName,
+        String compression, String blockCache, String blockSize,
+        String bloomFilter ,String maxVersions, String timeToLive, 
+        String inMemory) {
+      
+      // We keep track of all tables, because even though we
+      // only build a mapping for one table. We do this because of the way
+      // the mapping file is set up. 
+      // (First family properties are defined, whereafter columns are defined).
+      //
+      // HBaseMapping in fact does not need to support multiple tables,
+      // because a Store itself only supports a single table. (Every store 
+      // instance simply creates one mapping instance for itself).
+      //
+      // TODO A nice solution would be to redefine the mapping file structure.
+      // For example nest columns in families. Of course this would break compatibility.
+      
+      
+      Map<String, HColumnDescriptor> families = getOrCreateFamilies(tableName);;
+      
+      
+      HColumnDescriptor columnDescriptor = getOrCreateFamily(familyName, families);
+      
+      if(compression != null)
+        columnDescriptor.setCompressionType(Algorithm.valueOf(compression));
+      if(blockCache != null)
+        columnDescriptor.setBlockCacheEnabled(Boolean.parseBoolean(blockCache));
+      if(blockSize != null)
+        columnDescriptor.setBlocksize(Integer.parseInt(blockSize));
+      if(bloomFilter != null)
+        columnDescriptor.setBloomFilterType(BloomType.valueOf(bloomFilter));
+      if(maxVersions != null)
+        columnDescriptor.setMaxVersions(Integer.parseInt(maxVersions));
+      if(timeToLive != null)
+        columnDescriptor.setTimeToLive(Integer.parseInt(timeToLive));
+      if(inMemory != null)
+        columnDescriptor.setInMemory(Boolean.parseBoolean(inMemory));
+    }
+
+    public void addColumnFamily(String tableName, String familyName) {
+      Map<String, HColumnDescriptor> families = getOrCreateFamilies(tableName);
+      getOrCreateFamily(familyName, families);
+    }
+    
+    public void addField(String fieldName, String family, String qualifier) {
+      byte[] familyBytes = Bytes.toBytes(family);
+      byte[] qualifierBytes = qualifier == null ? null : 
+        Bytes.toBytes(qualifier);
+      
+      HBaseColumn column = new HBaseColumn(familyBytes, qualifierBytes);
+      columnMap.put(fieldName, column);
+    }
+    
+
+    private HColumnDescriptor getOrCreateFamily(String familyName,
+        Map<String, HColumnDescriptor> families) {
+      HColumnDescriptor columnDescriptor = families.get(familyName);
+      if (columnDescriptor == null) {
+        columnDescriptor=new HColumnDescriptor(familyName);
+        families.put(familyName, columnDescriptor);
+      }
+      return columnDescriptor;
+    }
+
+    private Map<String, HColumnDescriptor> getOrCreateFamilies(String tableName) {
+      Map<String, HColumnDescriptor> families;
+      families = tableToFamilies.get(tableName);
+      if (families == null) {
+        families = new HashMap<String, HColumnDescriptor>();
+        tableToFamilies.put(tableName, families);
+      }
+      return families;
+    }
+    
+    public void renameTable(String oldName, String newName) {
+      Map<String, HColumnDescriptor> families = tableToFamilies.remove(oldName);
+      if (families == null) throw new IllegalArgumentException(oldName + " does not exist");
+      tableToFamilies.put(newName, families);
+    }
+    
+    /**
+     * @return A newly constructed mapping.
+     */
+    public HBaseMapping build() {
+      if (tableName == null) throw new IllegalStateException("tableName is not specified");
+      
+      Map<String, HColumnDescriptor> families = tableToFamilies.get(tableName);
+      if (families == null) throw new IllegalStateException("no families for table " + tableName);
+      
+      HTableDescriptor tableDescriptors = new HTableDescriptor(tableName);
+      for (HColumnDescriptor desc : families.values()) {
+        tableDescriptors.addFamily(desc);
+      }
+      return new HBaseMapping(tableDescriptors, columnMap);
+    }
+  }
+
 }

@@ -20,21 +20,21 @@ package org.apache.gora.avro;
 
 import java.io.IOException;
 
-import junit.framework.Assert;
-
 import org.apache.avro.util.Utf8;
-import org.apache.gora.avro.PersistentDatumReader;
 import org.apache.gora.examples.WebPageDataCreator;
 import org.apache.gora.examples.generated.Employee;
 import org.apache.gora.examples.generated.WebPage;
 import org.apache.gora.memory.store.MemStore;
-import org.apache.gora.persistency.Persistent;
+import org.apache.gora.persistency.impl.PersistentBase;
 import org.apache.gora.query.Query;
 import org.apache.gora.query.Result;
 import org.apache.gora.store.DataStore;
 import org.apache.gora.store.DataStoreFactory;
 import org.apache.gora.store.DataStoreTestUtil;
+import org.apache.hadoop.conf.Configuration;
 import org.junit.Test;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertEquals;
 
 /**
  * Test case for {@link PersistentDatumReader}.
@@ -43,22 +43,23 @@ public class TestPersistentDatumReader {
 
   private PersistentDatumReader<WebPage> webPageDatumReader 
     = new PersistentDatumReader<WebPage>();
+  private Configuration conf = new Configuration();
   
-  private void testClone(Persistent persistent) throws IOException {
-    Persistent cloned = webPageDatumReader.clone(persistent, persistent.getSchema());
+  private void testClone(PersistentBase persistent) throws IOException {
+    PersistentBase cloned = ((PersistentBase)webPageDatumReader.clone(persistent, persistent.getSchema()));
     assertClone(persistent, cloned);
   }
   
-  private void assertClone(Persistent persistent, Persistent cloned) {
-    Assert.assertNotNull("cloned object is null", cloned);
-    Assert.assertEquals("cloned object is not equal to original object", persistent, cloned);
+  private void assertClone(PersistentBase persistent, PersistentBase cloned) {
+    assertNotNull("cloned object is null", cloned);
+    assertEquals("cloned object is not equal to original object", persistent, cloned);
   }
   
   @Test
   public void testCloneEmployee() throws Exception {
     @SuppressWarnings("unchecked")
     MemStore<String, Employee> store = DataStoreFactory.getDataStore(
-        MemStore.class, String.class, Employee.class);
+        MemStore.class, String.class, Employee.class, conf);
 
     Employee employee = DataStoreTestUtil.createEmployee(store);
     
@@ -86,7 +87,7 @@ public class TestPersistentDatumReader {
   public void testCloneWebPage() throws Exception {
     @SuppressWarnings("unchecked")
     DataStore<String, WebPage> store = DataStoreFactory.createDataStore(
-        MemStore.class, String.class, WebPage.class);
+        MemStore.class, String.class, WebPage.class, conf);
     WebPageDataCreator.createWebPageData(store);
 
     Query<String, WebPage> query = store.newQuery();
@@ -98,6 +99,6 @@ public class TestPersistentDatumReader {
       testClone(page);
       tested++;
     }
-    Assert.assertEquals(WebPageDataCreator.URLS.length, tested);
+    assertEquals(WebPageDataCreator.URLS.length, tested);
   }
 }

@@ -19,8 +19,10 @@
 package org.apache.gora.avro;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.WeakHashMap;
 
 import org.apache.avro.Schema;
@@ -36,13 +38,14 @@ import org.apache.gora.persistency.Persistent;
 import org.apache.gora.persistency.State;
 import org.apache.gora.persistency.StatefulHashMap;
 import org.apache.gora.persistency.StatefulMap;
+import org.apache.gora.persistency.impl.PersistentBase;
 import org.apache.gora.persistency.impl.StateManagerImpl;
 import org.apache.gora.util.IOUtils;
 
 /**
  * PersistentDatumReader reads, fields' dirty and readable information.
  */
-public class PersistentDatumReader<T extends Persistent>
+public class PersistentDatumReader<T extends PersistentBase>
   extends SpecificDatumReader<T> {
 
   private Schema rootSchema;
@@ -141,6 +144,9 @@ public class PersistentDatumReader<T extends Persistent>
       for (i = 0; i < dirtyFields.length; i++) {
         if (dirtyFields[i]) {
           persistent.setDirty(i);
+        } 
+        else {
+          persistent.clearDirty(i);
         }
       }
       return record;
@@ -163,26 +169,32 @@ public class PersistentDatumReader<T extends Persistent>
   @SuppressWarnings("unchecked")
   protected Object readMap(Object old, Schema expected, ResolvingDecoder in)
       throws IOException {
-
     StatefulMap<Utf8, ?> map = (StatefulMap<Utf8, ?>) newMap(old, 0);
-    map.clearStates();
+    Map<Utf8, State> tempStates = null;
     if (readDirtyBits) {
+      tempStates = new HashMap<Utf8, State>();
       int size = in.readInt();
       for (int j = 0; j < size; j++) {
         Utf8 key = in.readString(null);
         State state = State.values()[in.readInt()];
-        map.putState(key, state);
+        tempStates.put(key, state);
       }
     }
-    return super.readMap(map, expected, in);
+    super.readMap(map, expected, in);
+    map.clearStates();
+    if (readDirtyBits) {
+      for (Entry<Utf8, State> entry : tempStates.entrySet()) {
+        map.putState(entry.getKey(), entry.getValue());
+      }
+    }
+    return map;
   }
 
   @Override
   @SuppressWarnings({ "rawtypes" })
   protected Object newMap(Object old, int size) {
     if (old instanceof StatefulHashMap) {
-      ((Map) old).clear();
-      ((StatefulHashMap)old).clearStates();
+      ((StatefulHashMap)old).reuse();
       return old;
     }
     return new StatefulHashMap<Object, Object>();
@@ -201,7 +213,7 @@ public class PersistentDatumReader<T extends Persistent>
   }
   
   public Persistent clone(Persistent persistent, Schema schema) {
-    Persistent cloned = persistent.newInstance(new StateManagerImpl());
+    Persistent cloned = (PersistentBase)persistent.newInstance(new StateManagerImpl());
     List<Field> fields = schema.getFields();
     for(Field field: fields) {
       int pos = field.pos();
@@ -209,10 +221,10 @@ public class PersistentDatumReader<T extends Persistent>
         case MAP    :
         case ARRAY  :
         case RECORD : 
-        case STRING : cloned.put(pos, cloneObject(
-            field.schema(), persistent.get(pos), cloned.get(pos))); break;
+        case STRING : ((PersistentBase)cloned).put(pos, cloneObject(
+            field.schema(), ((PersistentBase)persistent).get(pos), ((PersistentBase)cloned).get(pos))); break;
         case NULL   : break;
-        default     : cloned.put(pos, persistent.get(pos)); break;
+        default     : ((PersistentBase)cloned).put(pos, ((PersistentBase)persistent).get(pos)); break;
       }
     }
     

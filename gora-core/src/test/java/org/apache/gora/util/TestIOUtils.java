@@ -27,27 +27,25 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.util.Arrays;
 
-import junit.framework.Assert;
-
 import org.apache.avro.ipc.ByteBufferInputStream;
 import org.apache.avro.ipc.ByteBufferOutputStream;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.apache.gora.mapreduce.GoraMapReduceUtils;
-import org.apache.gora.util.IOUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
 import org.junit.Test;
+import static org.junit.Assert.assertEquals;
 
 /**
  * Test case for {@link IOUtils} class.
  */
 public class TestIOUtils {
 
-  public static final Log log = LogFactory.getLog(TestIOUtils.class);
+  public static final Logger log = LoggerFactory.getLogger(TestIOUtils.class);
   
   public static Configuration conf = new Configuration();
 
@@ -122,13 +120,13 @@ public class TestIOUtils {
         log.info("Before: " + before);
         log.info("After : " + after);
         
-        Assert.assertEquals(before, after);
+        assertEquals(before, after);
       }
       
       //assert that the end of input is reached
       try {
         long skipped = dis.skip(1);
-        Assert.assertEquals(0, skipped);
+        assertEquals(0, skipped);
       }catch (EOFException expected) {
         //either should throw exception or return 0 as skipped
       }
@@ -204,10 +202,10 @@ public class TestIOUtils {
     boolean[] ret = IOUtils.readNullFieldsInfo(in);
 
     //assert
-    Assert.assertEquals(values.length, ret.length);
+    assertEquals(values.length, ret.length);
 
     for(int i=0; i<values.length; i++) {
-      Assert.assertEquals( values[i] == null , ret[i]);
+      assertEquals( values[i] == null , ret[i]);
     }
   }
   
@@ -238,9 +236,9 @@ public class TestIOUtils {
   }
   
   public void assertByteArrayEquals(byte[] expected, byte[] actual) {
-    Assert.assertEquals("Array lengths do not match", expected.length, actual.length);
+    assertEquals("Array lengths do not match", expected.length, actual.length);
     for(int j=0; j<expected.length; j++) {
-      Assert.assertEquals("bytes at position "+j+" do not match", expected[j], actual[j]);
+      assertEquals("bytes at position "+j+" do not match", expected[j], actual[j]);
     }
   }
 }

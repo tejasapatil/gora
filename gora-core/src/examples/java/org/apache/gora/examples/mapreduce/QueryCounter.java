@@ -32,6 +32,7 @@ import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.lib.output.NullOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
+import org.apache.gora.util.ClassLoadingUtils;
 
 /**
  * Example Hadoop job to count the row of a gora {@link Query}.
@@ -46,8 +47,7 @@ public class QueryCounter<K, T extends Persistent> extends Configured implements
   }
 
   public static class QueryCounterMapper<K, T extends Persistent>
-  extends GoraMapper<K, T
-    , NullWritable, NullWritable> {
+      extends GoraMapper<K, T, NullWritable, NullWritable> {
 
     @Override
     protected void map(K key, T value,
@@ -94,6 +94,7 @@ public class QueryCounter<K, T extends Persistent> extends Configured implements
   public long countQuery(DataStore<K,T> dataStore, Query<K,T> query) throws Exception {
     Job job = createJob(dataStore, query);
     job.waitForCompletion(true);
+    assert(job.isComplete() == true);
 
     return job.getCounters().findCounter(COUNTER_GROUP, ROWS).getValue();
   }
@@ -107,6 +108,7 @@ public class QueryCounter<K, T extends Persistent> extends Configured implements
 
     Job job = createJob(dataStore, query);
     job.waitForCompletion(true);
+    assert(job.isComplete() == true);
 
     return job.getCounters().findCounter(COUNTER_GROUP, ROWS).getValue();
   }
@@ -120,18 +122,19 @@ public class QueryCounter<K, T extends Persistent> extends Configured implements
       return 1;
     }
 
-    Class<K> keyClass = (Class<K>) Class.forName(args[0]);
-    Class<T> persistentClass = (Class<T>) Class.forName(args[1]);
+    Class<K> keyClass = (Class<K>) ClassLoadingUtils.loadClass(args[0]);
+    Class<T> persistentClass = (Class<T>) ClassLoadingUtils.loadClass(args[1]);
 
     DataStore<K,T> dataStore;
+    Configuration conf = new Configuration();
 
     if(args.length > 2) {
       Class<? extends DataStore<K,T>> dataStoreClass
           = (Class<? extends DataStore<K, T>>) Class.forName(args[2]);
-      dataStore = DataStoreFactory.getDataStore(dataStoreClass, keyClass, persistentClass);
+      dataStore = DataStoreFactory.getDataStore(dataStoreClass, keyClass, persistentClass, conf);
     }
     else {
-      dataStore = DataStoreFactory.getDataStore(keyClass, persistentClass);
+      dataStore = DataStoreFactory.getDataStore(keyClass, persistentClass, conf);
     }
 
     long results = countQuery(dataStore);

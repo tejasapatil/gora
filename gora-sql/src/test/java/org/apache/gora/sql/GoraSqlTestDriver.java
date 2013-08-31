@@ -24,6 +24,7 @@ import java.util.Properties;
 
 import org.apache.gora.GoraTestDriver;
 import org.apache.gora.sql.store.SqlStore;
+import org.apache.gora.util.ClassLoadingUtils;
 import org.apache.hadoop.util.StringUtils;
 import org.hsqldb.Server;
 
@@ -46,8 +47,8 @@ public class GoraSqlTestDriver extends GoraTestDriver {
   /** Password to access the database */
   protected static final String PASSWORD_PROPERTY = "jdbc.password";
 
-
-  private static final String JDBC_URL = "jdbc:hsqldb:hsql://localhost/goratest";
+  private static final String HSQLDB_PORT = System.getProperty("hsqldb.port") != null ? System.getProperty("hsqldb.port") : "9001";
+  private static final String JDBC_URL = String.format("jdbc:hsqldb:hsql://localhost:%s/goratest",HSQLDB_PORT);
   private static final String JDBC_DRIVER_CLASS = "org.hsqldb.jdbcDriver";
 
   private Server server;
@@ -63,6 +64,7 @@ public class GoraSqlTestDriver extends GoraTestDriver {
         System.getProperty("test.build.data", "/tmp") + "/goratest");
     server.setDatabaseName(0, "goratest");
     server.setDaemon(true);
+    server.setPort(Integer.parseInt(HSQLDB_PORT));
     server.start();
   }
 
@@ -98,7 +100,7 @@ public class GoraSqlTestDriver extends GoraTestDriver {
   private Connection createConnection(String driverClassName
       , String url) throws Exception {
 
-    Class.forName(driverClassName);
+    ClassLoadingUtils.loadClass(driverClassName);
     Connection connection = DriverManager.getConnection(url);
     connection.setAutoCommit(false);
     return connection;

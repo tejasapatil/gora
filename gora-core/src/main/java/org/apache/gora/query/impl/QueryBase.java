@@ -25,23 +25,27 @@ import java.io.IOException;
 import org.apache.commons.lang.builder.EqualsBuilder;
 import org.apache.commons.lang.builder.HashCodeBuilder;
 import org.apache.commons.lang.builder.ToStringBuilder;
-import org.apache.gora.persistency.Persistent;
+import org.apache.gora.persistency.impl.PersistentBase;
 import org.apache.gora.query.Query;
 import org.apache.gora.query.Result;
 import org.apache.gora.store.DataStore;
+import org.apache.gora.store.impl.DataStoreBase;
+import org.apache.gora.util.ClassLoadingUtils;
 import org.apache.gora.util.IOUtils;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.conf.Configurable; 
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.WritableUtils;
+import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.util.ReflectionUtils;
 
 /**
  * Base class for Query implementations.
  */
-public abstract class QueryBase<K, T extends Persistent>
-implements Query<K,T> {
-
-  protected DataStore<K,T> dataStore;
+public abstract class QueryBase<K, T extends PersistentBase>
+    implements Query<K,T>, Writable, Configurable {
+	
+  protected DataStoreBase<K,T> dataStore;
 
   protected String queryString;
   protected String[] fields;
@@ -56,30 +60,20 @@ implements Query<K,T> {
 
   protected long limit = -1;
 
-  protected boolean isCompiled = false;
-
   private Configuration conf;
 
   public QueryBase(DataStore<K,T> dataStore) {
-    this.dataStore = dataStore;
+    this.dataStore = (DataStoreBase<K, T>)dataStore;
   }
 
   @Override
-  public Result<K,T> execute() throws IOException {
-    //compile();
+  public Result<K,T> execute() {
     return dataStore.execute(this);
   }
 
-//  @Override
-//  public void compile() {
-//    if(!isCompiled) {
-//      isCompiled = true;
-//    }
-//  }
-
   @Override
   public void setDataStore(DataStore<K, T> dataStore) {
-    this.dataStore = dataStore;
+    this.dataStore = (DataStoreBase<K, T>)dataStore;
   }
 
   @Override
@@ -202,12 +196,10 @@ public String[] getFields() {
     return limit;
   }
 
-  @Override
   public Configuration getConf() {
     return conf;
   }
 
-  @Override
   public void setConf(Configuration conf) {
     this.conf = conf;
   }
@@ -217,8 +209,7 @@ public String[] getFields() {
   public void readFields(DataInput in) throws IOException {
     String dataStoreClass = Text.readString(in);
     try {
-      dataStore = (DataStore<K, T>) ReflectionUtils.newInstance(
-          Class.forName(dataStoreClass), conf);
+      dataStore = (DataStoreBase<K, T>) ReflectionUtils.newInstance(ClassLoadingUtils.loadClass(dataStoreClass), conf);
       dataStore.readFields(in);
     } catch (ClassNotFoundException ex) {
       throw new IOException(ex);
@@ -242,7 +233,7 @@ public String[] getFields() {
     limit = WritableUtils.readVLong(in);
   }
 
-  @Override
+  //@Override
   public void write(DataOutput out) throws IOException {
     //write datastore
     Text.writeString(out, dataStore.getClass().getCanonicalName());

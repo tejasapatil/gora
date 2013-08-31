@@ -27,7 +27,11 @@ import org.apache.gora.examples.generated.WebPage;
 import org.apache.gora.memory.store.MemStore;
 import org.apache.gora.store.DataStoreFactory;
 import org.apache.gora.store.DataStoreTestUtil;
-import org.junit.Assert;
+import org.apache.hadoop.conf.Configuration;
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
+
 import org.junit.Test;
 
 /**
@@ -39,7 +43,7 @@ public class TestPersistentBase {
   public void testGetFields() {
     WebPage page = new WebPage();
     String[] fields = page.getFields();
-    Assert.assertArrayEquals(WebPage._ALL_FIELDS, fields);
+    assertArrayEquals(WebPage._ALL_FIELDS, fields);
   }
   
   @Test
@@ -47,7 +51,7 @@ public class TestPersistentBase {
     WebPage page = new WebPage();
     for(int i=0; i<WebPage._ALL_FIELDS.length; i++) {
       String field = page.getField(i);
-      Assert.assertEquals(WebPage._ALL_FIELDS[i], field);
+      assertEquals(WebPage._ALL_FIELDS[i], field);
     }
   }
   
@@ -56,7 +60,7 @@ public class TestPersistentBase {
     WebPage page = new WebPage();
     for(int i=0; i<WebPage._ALL_FIELDS.length; i++) {
       int index = page.getFieldIndex(WebPage._ALL_FIELDS[i]);
-      Assert.assertEquals(i, index);
+      assertEquals(i, index);
     }
   }
   
@@ -65,12 +69,12 @@ public class TestPersistentBase {
     WebPage page = new WebPage();
     for(int i=0; i<WebPage._ALL_FIELDS.length; i++) {
       int index = page.getFieldIndex(WebPage._ALL_FIELDS[i]);
-      Assert.assertEquals(i, index);
+      assertEquals(i, index);
     }
     Employee employee = new Employee();
     for(int i=0; i<Employee._ALL_FIELDS.length; i++) {
       int index = employee.getFieldIndex(Employee._ALL_FIELDS[i]);
-      Assert.assertEquals(i, index);
+      assertEquals(i, index);
     }
   }
   
@@ -86,10 +90,10 @@ public class TestPersistentBase {
     
     page.clear();
     
-    Assert.assertNull(page.getUrl());
-    Assert.assertEquals(0, page.getParsedContent().size());
-    Assert.assertEquals(0, page.getOutlinks().size());
-    Assert.assertNull(page.getContent());
+    assertNull(page.getUrl());
+    assertEquals(0, page.getParsedContent().size());
+    assertEquals(0, page.getOutlinks().size());
+    assertNull(page.getContent());
     
     //set fields again
     page.setUrl(new Utf8("http://bar.com"));
@@ -107,14 +111,14 @@ public class TestPersistentBase {
   }
   
   @Test
-  public void testClone() throws IOException {
+  public void testClone() throws IOException, Exception {
     //more tests for clone are in TestPersistentDatumReader
     @SuppressWarnings("unchecked")
     MemStore<String, Employee> store = DataStoreFactory.getDataStore(
-        MemStore.class, String.class, Employee.class);
+        MemStore.class, String.class, Employee.class, new Configuration());
 
     Employee employee = DataStoreTestUtil.createEmployee(store);
     
-    Assert.assertEquals(employee, employee.clone());
+    assertEquals(employee, employee.clone());
   }
 }

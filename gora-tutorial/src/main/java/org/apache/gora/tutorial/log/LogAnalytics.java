@@ -20,14 +20,15 @@ package org.apache.gora.tutorial.log;
 import java.io.IOException;
 
 import org.apache.avro.util.Utf8;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.apache.gora.mapreduce.GoraMapper;
 import org.apache.gora.mapreduce.GoraReducer;
 import org.apache.gora.store.DataStore;
 import org.apache.gora.store.DataStoreFactory;
 import org.apache.gora.tutorial.log.generated.MetricDatum;
 import org.apache.gora.tutorial.log.generated.Pageview;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
@@ -47,7 +48,7 @@ import org.apache.hadoop.util.ToolRunner;
  */
 public class LogAnalytics extends Configured implements Tool {
 
-  private static final Log log = LogFactory.getLog(LogAnalytics.class);
+  private static final Logger log = LoggerFactory.getLogger(LogAnalytics.class);
   
   /** The number of miliseconds in a day */
   private static final long DAY_MILIS = 1000 * 60 * 60 * 24;
@@ -58,8 +59,8 @@ public class LogAnalytics extends Configured implements Tool {
    * read from the input data store.
    * Note that all Hadoop serializable classes can be used as map output key and value.
    */
-  public static class LogAnalyticsMapper 
-    extends GoraMapper<Long, Pageview, TextLong, LongWritable> {
+  public static class LogAnalyticsMapper extends GoraMapper<Long, Pageview, TextLong,
+      LongWritable> {
     
     private LongWritable one = new LongWritable(1L);
   
@@ -73,8 +74,8 @@ public class LogAnalytics extends Configured implements Tool {
     };
     
     @Override
-    protected void map(Long key, Pageview pageview, Context context) 
-      throws IOException ,InterruptedException {
+    protected void map(Long key, Pageview pageview, Context context)
+        throws IOException ,InterruptedException {
       
       Utf8 url = pageview.getUrl();
       long day = getDay(pageview.getTimestamp());
@@ -98,14 +99,13 @@ public class LogAnalytics extends Configured implements Tool {
    * {@link MetricDatum} objects. The metric datum objects are stored 
    * as job outputs in the output data store.
    */
-  public static class LogAnalyticsReducer 
-    extends GoraReducer<TextLong, LongWritable, String, MetricDatum> {
+  public static class LogAnalyticsReducer extends GoraReducer<TextLong, LongWritable,
+      String, MetricDatum> {
     
     private MetricDatum metricDatum = new MetricDatum();
     
     @Override
-    protected void reduce(TextLong tuple
-        , Iterable<LongWritable> values, Context context) 
+    protected void reduce(TextLong tuple, Iterable<LongWritable> values, Context context)
       throws IOException ,InterruptedException {
       
       long sum = 0L; //sum up the values
@@ -129,23 +129,24 @@ public class LogAnalytics extends Configured implements Tool {
   
   /**
    * Creates and returns the {@link Job} for submitting to Hadoop mapreduce.
-   * @param dataStore
-   * @param query
+   * @param inStore
+   * @param outStore
+   * @param numReducer
    * @return
    * @throws IOException
    */
-  public Job createJob(DataStore<Long, Pageview> inStore
-      , DataStore<String, MetricDatum> outStore, int numReducer) throws IOException {
+  public Job createJob(DataStore<Long, Pageview> inStore,
+      DataStore<String, MetricDatum> outStore, int numReducer) throws IOException {
     Job job = new Job(getConf());
-
     job.setJobName("Log Analytics");
+    log.info("Creating Hadoop Job: " + job.getJobName());
     job.setNumReduceTasks(numReducer);
     job.setJarByClass(getClass());
 
     /* Mappers are initialized with GoraMapper.initMapper() or 
      * GoraInputFormat.setInput()*/
-    GoraMapper.initMapperJob(job, inStore, TextLong.class, LongWritable.class
-        , LogAnalyticsMapper.class, true);
+    GoraMapper.initMapperJob(job, inStore, TextLong.class, LongWritable.class,
+        LogAnalyticsMapper.class, true);
 
     /* Reducers are initialized with GoraReducer#initReducer().
      * If the output is not to be persisted via Gora, any reducer 
@@ -160,19 +161,20 @@ public class LogAnalytics extends Configured implements Tool {
     
     DataStore<Long, Pageview> inStore;
     DataStore<String, MetricDatum> outStore;
-    
+    Configuration conf = new Configuration();
+
     if(args.length > 0) {
       String dataStoreClass = args[0];
-      inStore = DataStoreFactory.getDataStore(dataStoreClass, 
-          Long.class, Pageview.class);
+      inStore = DataStoreFactory.
+          getDataStore(dataStoreClass, Long.class, Pageview.class, conf);
       if(args.length > 1) {
         dataStoreClass = args[1];
       }
-      outStore = DataStoreFactory.getDataStore(dataStoreClass, 
-          String.class, MetricDatum.class);
+      outStore = DataStoreFactory.
+          getDataStore(dataStoreClass, String.class, MetricDatum.class, conf);
     } else {
-      inStore = DataStoreFactory.getDataStore(Long.class, Pageview.class);
-      outStore = DataStoreFactory.getDataStore(String.class, MetricDatum.class);
+	    inStore = DataStoreFactory.getDataStore(Long.class, Pageview.class, conf);
+	    outStore = DataStoreFactory.getDataStore(String.class, MetricDatum.class, conf);
     }
     
     Job job = createJob(inStore, outStore, 3);
@@ -186,7 +188,13 @@ public class LogAnalytics extends Configured implements Tool {
     return success ? 0 : 1;
   }
   
+  private static final String USAGE = "LogAnalytics <input_data_store> <output_data_store>";
+  
   public static void main(String[] args) throws Exception {
+    if(args.length < 2) {
+      System.err.println(USAGE);
+      System.exit(1);
+    }
     //run as any other MR job
     int ret = ToolRunner.run(new LogAnalytics(), args);
     System.exit(ret);
