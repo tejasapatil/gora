@@ -17,18 +17,18 @@
     limitations under the License.
     -->
     
-	<modelVersion>4.0.0</modelVersion>
+  <modelVersion>4.0.0</modelVersion>
 
-	<parent>
-		<groupId>org.apache.gora</groupId>
-		<artifactId>gora</artifactId>
-		<version>0.4-SNAPSHOT</version>
-		<relativePath>../</relativePath>
-	</parent>
-	<artifactId>gora-voldemort</artifactId>
-	<packaging>bundle</packaging>
+  <parent>
+    <groupId>org.apache.gora</groupId>
+    <artifactId>gora</artifactId>
+    <version>0.4-SNAPSHOT</version>
+    <relativePath>../</relativePath>
+  </parent>
+  <artifactId>gora-voldemort</artifactId>
+  <packaging>bundle</packaging>
 
-	<name>Apache Gora :: Voldemort</name>
+  <name>Apache Gora :: Voldemort</name>
         <url>http://gora.apache.org</url>
     <description>The Apache Gora open source framework provides an in-memory data model and 
     persistence for big data. Gora supports persisting to column stores, key value stores, 
@@ -80,6 +80,24 @@
                 <artifactId>build-helper-maven-plugin</artifactId>
                 <version>${build-helper-maven-plugin.version}</version>
                 <executions>
+                  <execution>
+                  <id>add-resource</id>
+		            <phase>generate-resources</phase>
+		            <goals>
+		              <goal>add-resource</goal>
+		            </goals>
+		            <configuration>
+		              <resources>
+		                <resource>
+		                  <directory>lib-ext/voldemort-1.3-libs</directory>
+		                  <targetPath>voldemort-1.3-libs</targetPath>
+		                  <includes>
+		                    <include>*.jar</include>
+		                  </includes>
+		                </resource>
+		              </resources>
+		            </configuration>
+                    </execution>
                     <execution>
                         <phase>generate-sources</phase>
                         <goals>
@@ -119,6 +137,14 @@
             <systemPath>${project.basedir}/lib-ext/voldemort-1.3.0.jar</systemPath>
         </dependency>
         
+        <!-- Misc Deps -->
+        <dependency>
+          <groupId>org.apache.commons</groupId>
+          <artifactId>commons-io</artifactId>
+          <version>1.3.2</version>
+          <scope>test</scope>
+        </dependency>
+        
         <!-- Hadoop Dependencies 
         <dependency>
             <groupId>org.apache.hadoop</groupId>
@@ -140,6 +166,19 @@
         <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>
+        </dependency>
+        
+        <dependency>
+          <groupId>com.google.collections</groupId>
+          <artifactId>google-collections</artifactId>
+          <version>1.0</version>
+          <scope>system</scope>
+          <systemPath>${project.basedir}/lib-ext/voldemort-1.3-libs/google-collect-1.0.jar</systemPath>
+        </dependency>
+        
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
         </dependency>
 
 <!--        <dependency>

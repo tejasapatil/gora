@@ -22,9 +22,5 @@ import java.util.Map;
 import org.apache.hadoop.io.Text;
 
 public class VoldemortMapping {
-  Map<String,Pair<Text,Text>> fieldMap = new HashMap<String,Pair<Text,Text>>();
-  Map<Pair<Text,Text>,String> columnMap = new HashMap<Pair<Text,Text>,String>();
-  Map<String,String> tableConfig = new HashMap<String,String>();
-  String tableName;
-  String encoder;
+
 }
