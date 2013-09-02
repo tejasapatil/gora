@@ -25,10 +25,7 @@ import org.slf4j.LoggerFactory;
 public class GoraVoldemortTestDriver extends GoraTestDriver {
   private static VoldemortServer server = null;
   private static StoreClient<String, String> client = null;
-
   private static String TEST_CLIENT = "test";
-  //private static String BASE_DIR = "/home/tpatil/wallet/gora/gora-voldemort/";
-
   private static Logger log = LoggerFactory.getLogger(GoraVoldemortTestDriver.class);
 
   /**
@@ -103,25 +100,11 @@ public class GoraVoldemortTestDriver extends GoraTestDriver {
     System.out.println("Voldemort server started");
   }
   
-  
-  public static void printClasspath() {
-
-       ClassLoader cl = ClassLoader.getSystemClassLoader();
-
-       URL[] urls = ((URLClassLoader)cl).getURLs();
-
-       for(URL url: urls){
-       	System.out.println(url.getFile());
-       }
-  }
-
   private static void setVoldemortClient() {
     String bootstrapUrl = "tcp://localhost:6666";
     StoreClientFactory factory = new SocketStoreClientFactory(new ClientConfig().setBootstrapUrls(bootstrapUrl));
-    StoreClient<String, String> client = factory.getStoreClient("test");		
+    StoreClient<String, String> client = factory.getStoreClient("test");
   }
-
-
 
   private void createClient() throws IOException {
     String bootstrapUrl = "tcp://localhost:6666";

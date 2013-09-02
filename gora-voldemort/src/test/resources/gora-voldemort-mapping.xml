@@ -16,21 +16,14 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 -->
-
+<?xml version="1.0" encoding="UTF-8"?>
 <gora-orm>
-  <store name="test">
-    <config key="persistence" value="bdb"/>
-    <config key="owners" value="tpatil@apache.org"/>
-    <config key="routing-strategy" value="consistent-routing"/>
-    <config key="routing" value="client"/>
-    <config key="replication-factor" value="1"/>
-    <config key="required-reads" value="1"/>
-    <config key="required-writes" value="1"/>
-    <config key="key-serializer" value="string"/>
-    <config key="value-serializer" value="string"/>
-  </store>
-  
-  <class name="org.apache.gora.examples.generated.Foo" keyClass="java.lang.String">
-    <field name="value" qualifier="count"/>
-  </class>  
+
+<class name=”org.apache.gora.examples.generated.Employee” keyClass=”java.lang.String” store=”employee” serverurl="tcp://localhost:6666">
+    <key name=”ssn” column=”ssn” />
+    <field name=”name” column=”name” />
+    <field name=”dateOfBirth” column=”dateOfBirth” />
+    <field name=”salary” column=”salary” />
+  </class>
+
 </gora-orm>  

@@ -16,11 +16,110 @@
  */
 package org.apache.gora.voldemort.store;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.io.IOException;
+import java.util.LinkedList;
+import java.util.List;
 
-import org.apache.hadoop.io.Text;
+import org.apache.gora.util.GoraException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import voldemort.client.ClientConfig;
+import voldemort.client.SocketStoreClientFactory;
+import voldemort.client.StoreClientFactory;
 
 public class VoldemortMapping {
+  private static final String DEFAULT_MAPPING_FILE = "gora-voldemort-mapping.xml";	  
 
+  private String store = null;
+  private String serverUrl = null;
+  private String key = null;
+  private String keyClass = null;
+  private List<String> fields = null;
+
+  public VoldemortMapping() {
+    fields = new LinkedList<String>();
+  }
+  
+  public VoldemortMapping(String store, String serverUrl, String key, String keyClass, List<String> fields) {
+    this.store = store;
+    this.serverUrl = serverUrl;
+    this.key = key;
+    this.keyClass= keyClass; 
+    this.fields = fields;
+  }
+  
+  public String getStore() {
+    return store;
+  }
+  public void setStore(String store) {
+    this.store = store;
+  }
+  public String getServerUrl() {
+    return serverUrl;
+  }
+  public void setServerUrl(String serverUrl) {
+    this.serverUrl = serverUrl;
+  }
+  public String getKey() {
+    return key;
+  }
+  public void setKey(String key) {
+    this.key = key;
+  }
+  public String getKeyClass() {
+    return keyClass;
+  }
+  public void setKeyClass(String keyClass) {
+    this.keyClass = keyClass;
+  }
+  public List<String> getFields() {
+    return fields;
+  }
+  public void setFields(List<String> fields) {
+    this.fields = fields;
+  }  
+
+  public static class VoldemortMappingBuilder {
+
+    private static final Logger LOG = LoggerFactory.getLogger(VoldemortMappingBuilder.class);
+
+    private String store = null;
+    private String serverUrl = null;
+    private String key = null;
+    private String keyClass = null;
+    private List<String> fields = null;
+
+    public void setStore(String store) {
+      this.store = store;
+    }
+    public void setServerUrl(String serverUrl) {
+      this.serverUrl = serverUrl;
+    }
+    public void setKey(String key) {
+      this.key = key;
+    }
+    public void setKeyClass(String keyClass) {
+      this.keyClass = keyClass;
+    }
+    public void addField(String field) {
+      fields.add(field);
+    }
+
+    /**
+     * Verifies that all properties are valid and constructs the VoldemortMapping object.
+     * @return A newly constructed mapping
+     * @throws GoraException
+     */
+    public VoldemortMapping build() throws GoraException {
+      if (store == null)      throw new GoraException("store is not specified.");
+      if (serverUrl == null)  throw new GoraException("serverUrl is not specified.");
+      if (key == null)        throw new GoraException("key is not specified.");
+      if (keyClass == null)   throw new GoraException("keyClass is not specified.");
+      if (fields.isEmpty())   throw new GoraException("No fields specified.");
+      LOG.debug("VoldemortMappingBuilder.build completed all checks.");
+
+      return new VoldemortMapping(store, serverUrl, key, keyClass, fields);
+    }
+  }
 }
