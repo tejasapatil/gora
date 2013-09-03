@@ -19,8 +19,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <gora-orm>
 
-<class name=”org.apache.gora.examples.generated.Employee” keyClass=”java.lang.String” store=”employee” serverurl="tcp://localhost:6666">
-    <key name=”ssn” column=”ssn” />
+  <class name=”org.apache.gora.examples.generated.Employee” keyClass=”java.lang.String” store=”employee” serverurl="tcp://localhost:6666">
+    <key name=”ssn” />
     <field name=”name” column=”name” />
     <field name=”dateOfBirth” column=”dateOfBirth” />
     <field name=”salary” column=”salary” />

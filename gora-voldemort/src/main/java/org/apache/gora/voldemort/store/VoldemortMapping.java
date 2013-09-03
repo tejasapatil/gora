@@ -16,7 +16,6 @@
  */
 package org.apache.gora.voldemort.store;
 
-import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -24,13 +23,7 @@ import org.apache.gora.util.GoraException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import voldemort.client.ClientConfig;
-import voldemort.client.SocketStoreClientFactory;
-import voldemort.client.StoreClientFactory;
-
 public class VoldemortMapping {
-  private static final String DEFAULT_MAPPING_FILE = "gora-voldemort-mapping.xml";	  
-
   private String store = null;
   private String serverUrl = null;
   private String key = null;
